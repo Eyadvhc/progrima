@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>لوحة تحكم الإدارة - ProgriMa</title>
+    <!-- مكتبات Tailwind و React و Firebase -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-stone-50 text-neutral-800 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(async ({ initializeApp }) => {
+            const { getFirestore, collection, getDocs, updateDoc, deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyC4zrNwt50xf-NUdhoBMdYz0btjQHF2X44",
+                authDomain: "web-design-d17e9.firebaseapp.com",
+                projectId: "web-design-d17e9",
+                storageBucket: "web-design-d17e9.appspot.com",
+                messagingSenderId: "590917738754",
+                appId: "1:590917738754:web:ee6139c2edf43a36d2221b",
+                measurementId: "G-C8YDWRRNK5"
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+
+            function AdminApp() {
+                const [adminOrders, setAdminOrders] = useState([]);
+                const [adminLoading, setAdminLoading] = useState(false);
+
+                const fetchAdminOrders = async () => {
+                    setAdminLoading(true);
+                    try {
+                        const querySnapshot = await getDocs(collection(db, "orders"));
+                        const ordersList = [];
+                        querySnapshot.forEach((docSnap) => {
+                            ordersList.push({ id: docSnap.id, ...docSnap.data() });
+                        });
+                        setAdminOrders(ordersList);
+                    } catch (error) {
+                        console.error(error);
+                        alert("فشل تحميل لوحة الإدارة.");
+                    } finally {
+                        setAdminLoading(false);
+                    }
+                };
+
+                const handleUpdateStatus = async (orderId, newStatus) => {
+                    try {
+                        const orderRef = doc(db, "orders", orderId);
+                        await updateDoc(orderRef, { status: newStatus });
+                        setAdminOrders(adminOrders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+                    } catch (error) {
+                        console.error(error);
+                        alert("فشل تحديث الحالة.");
+                    }
+                };
+
+                const handleDeleteOrder = async (orderId) => {
+                    if (confirm("هل أنت متأكد من حذف هذا الطلب نهائياً؟")) {
+                        try {
+                            await deleteDoc(doc(db, "orders", orderId));
+                            setAdminOrders(adminOrders.filter(o => o.id !== orderId));
+                        } catch (error) {
+                            console.error(error);
+                            alert("فشل حذف الطلب.");
+                        }
+                    }
+                };
+
+                useEffect(() => {
+                    fetchAdminOrders();
+                }, []);
+
+                return (
+                    <div className="min-h-screen p-3 sm:p-6 relative" dir="rtl">
+                        <header className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-stone-200 p-4 mb-6 flex justify-between items-center">
+                            <div>
+                                <h1 className="text-xl font-extrabold text-stone-900 tracking-tight">ProgriMa <span className="text-xs font-normal text-stone-500">| لوحة الإدارة</span></h1>
+                                <p className="text-xs text-stone-500 mt-0.5">إدارة ومتابعة طلبات العملاء وتحديث حالاتهم أو حذفهم</p>
+                            </div>
+                            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-200">وضع المدير ⚙️</span>
+                        </header>
+
+                        <main className="max-w-4xl mx-auto">
+                            <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5 sm:p-8">
+                                <div className="flex justify-between items-center mb-6 border-b border-stone-200 pb-4">
+                                    <h2 className="text-xl font-bold text-stone-900">جميع الطلبات الواردة</h2>
+                                    <button 
+                                        onClick={fetchAdminOrders}
+                                        className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm">
+                                        تحديث القائمة 🔄
+                                    </button>
+                                </div>
+
+                                {adminLoading ? (
+                                    <div className="text-center text-stone-500 py-12 text-sm">جاري تحميل الطلبات من قاعدة البيانات...</div>
+                                ) : adminOrders.length === 0 ? (
+                                    <div className="text-center text-stone-500 py-12 bg-stone-50 rounded-xl border border-stone-200 text-sm">لا توجد أي طلبات مسجلة حتى الآن.</div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {adminOrders.map((order) => (
+                                            <div key={order.id} className="border border-stone-200 rounded-xl p-5 bg-stone-50/40 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition hover:border-stone-300">
+                                                <div className="space-y-1.5 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="bg-amber-100 text-amber-800 font-bold text-xs px-2.5 py-1 rounded-md">كود: {order.trackingCode}</span>
+                                                        <h3 className="font-bold text-stone-900 text-base">{order.name}</h3>
+                                                        <span className="text-xs px-2 py-0.5 rounded font-bold bg-stone-200 text-stone-700">الحالة: {order.status || "قيد الانتظار"}</span>
+                                                    </div>
+                                                    <p className="text-stone-600 text-xs"><b>للتواصل:</b> {order.contact}</p>
+                                                    <p className="text-stone-700 text-sm bg-white p-3 rounded-lg border border-stone-200 mt-1 leading-relaxed"><b>التفاصيل:</b> {order.details}</p>
+                                                    {order.imageBase64 && (
+                                                        <div className="mt-2">
+                                                            <a href={order.imageBase64} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline inline-block font-semibold bg-blue-50 px-2.5 py-1 rounded border border-blue-100">عرض المرفق المصور 🖼️</a>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex flex-col gap-2 w-full md:w-auto min-w-[160px]">
+                                                    <div className="text-xs font-bold text-stone-500 mb-1">تغيير الحالة:</div>
+                                                    <button 
+                                                        onClick={() => handleUpdateStatus(order.id, "قيد الانتظار (Pending)")}
+                                                        className="w-full bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold py-1.5 px-3 rounded-lg transition text-right">
+                                                        ⏳ قيد الانتظار
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleUpdateStatus(order.id, "جاري التنفيذ (In Progress)")}
+                                                        className="w-full bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold py-1.5 px-3 rounded-lg transition text-right">
+                                                        ⚙️ جاري التنفيذ
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleUpdateStatus(order.id, "تم الانتهاء (Completed)")}
+                                                        className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold py-1.5 px-3 rounded-lg transition text-right">
+                                                        ✅ تم الانتهاء
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleUpdateStatus(order.id, "ملغي (Cancelled)")}
+                                                        className="w-full bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold py-1.5 px-3 rounded-lg transition text-right">
+                                                        🚫 إلغاء الطلب
+                                                    </button>
+                                                    
+                                                    <div className="border-t border-stone-200 my-1 pt-1"></div>
+
+                                                    <button 
+                                                        onClick={() => handleDeleteOrder(order.id)}
+                                                        className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-3 rounded-lg transition shadow-sm text-center">
+                                                        🗑️ حذف الطلب نهائياً
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </main>
+                    </div>
+                );
+            }
+
+            ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
+        });
+    </script>
+</body>
+</html>

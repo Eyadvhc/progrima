@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ProgriMa - خدمات تصميم وتطوير الويب</title>
+    <!-- مكتبات Tailwind و React و Firebase و EmailJS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+<body class="bg-stone-50 text-neutral-800 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(async ({ initializeApp }) => {
+            const { getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyC4zrNwt50xf-NUdhoBMdYz0btjQHF2X44",
+                authDomain: "web-design-d17e9.firebaseapp.com",
+                projectId: "web-design-d17e9",
+                storageBucket: "web-design-d17e9.appspot.com",
+                messagingSenderId: "590917738754",
+                appId: "1:590917738754:web:ee6139c2edf43a36d2221b",
+                measurementId: "G-C8YDWRRNK5"
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+
+            if (window.emailjs) {
+                emailjs.init("Cl8jyGKYNWF4u8G9g");
+            }
+
+            function NetworkImageBanner() {
+                return (
+                    <div className="relative w-full h-64 sm:h-80 rounded-2xl overflow-hidden shadow-md mb-8 bg-white border border-stone-200">
+                        <img 
+                            src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80" 
+                            alt="تصميم ومظهر المنصة" 
+                            className="w-full h-full object-cover filter brightness-95"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent flex items-end p-6">
+                            <div className="text-white">
+                                <span className="bg-amber-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-sm">ProgriMa Studio</span>
+                                <h2 className="text-xl sm:text-2xl font-bold mt-1">نصنع واجهات ويب تلهم عملائك</h2>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            function ClientApp() {
+                const [activeTab, setActiveTab] = useState('home');
+                const [selectedProduct, setSelectedProduct] = useState('');
+                
+                const [name, setName] = useState('');
+                const [contact, setContact] = useState('');
+                const [details, setDetails] = useState('');
+                const [imageFile, setImageFile] = useState(null);
+                const [submitting, setSubmitting] = useState(false);
+
+                const [successModalData, setSuccessModalData] = useState(null);
+                const [copied, setCopied] = useState(false);
+
+                const [trackCode, setTrackCode] = useState('');
+                const [trackResult, setTrackResult] = useState(null);
+                const [trackingLoading, setTrackingLoading] = useState(false);
+
+                const handleSelectProduct = (productName) => {
+                    setSelectedProduct(productName);
+                    setDetails(`حجز موقع: ${productName}`);
+                    setActiveTab('order');
+                };
+
+                const compressAndConvertImage = (file) => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(file);
+                        reader.onload = (event) => {
+                            const img = new Image();
+                            img.src = event.target.result;
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                let width = img.width;
+                                let height = img.height;
+                                const MAX_WIDTH = 1200;
+                                const MAX_HEIGHT = 1200;
+
+                                if (width > height) {
+                                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                                } else {
+                                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                                }
+
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                resolve(canvas.toDataURL('image/jpeg', 0.7));
+                            };
+                            img.onerror = (error) => reject(error);
+                        };
+                        reader.onerror = (error) => reject(error);
+                    });
+                };
+
+                const handleSubmitOrder = async (e) => {
+                    e.preventDefault();
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(contact)) {
+                        alert("الرجاء إدخال بريد إلكتروني صحيح!");
+                        return;
+                    }
+
+                    setSubmitting(true);
+                    const trackingCode = Math.floor(1000 + Math.random() * 9000).toString();
+                    let base64Image = "";
+
+                    try {
+                        if (imageFile) {
+                            if (imageFile.size > 25 * 1024 * 1024) {
+                                alert("حجم الصورة كبير جداً، الحد الأقصى 25 ميجابايت.");
+                                setSubmitting(false);
+                                return;
+                            }
+                            base64Image = await compressAndConvertImage(imageFile);
+                        }
+
+                        await addDoc(collection(db, "orders"), {
+                            name,
+                            contact,
+                            details,
+                            imageBase64: base64Image,
+                            trackingCode,
+                            status: "قيد الانتظار",
+                            timestamp: serverTimestamp()
+                        });
+
+                        if (window.emailjs) {
+                            await emailjs.send("service_zorsf4i", "template_im4z7xh", {
+                                from_name: name,
+                                phone: contact,
+                                message: `الطلب عبر ProgriMa: ${details} | كود التتبع: ${trackingCode} | يرجى متابعة التحويل على المحفظة 01222635954`
+                            });
+                        }
+
+                        setSuccessModalData({ name, trackingCode, details });
+                        setName('');
+                        setContact('');
+                        setDetails('');
+                        setImageFile(null);
+                    } catch (error) {
+                        console.error(error);
+                        alert("حدث خطأ أثناء إرسال الطلب.");
+                    } finally {
+                        setSubmitting(false);
+                    }
+                };
+
+                const copyToClipboard = (text) => {
+                    navigator.clipboard.writeText(text);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2500);
+                };
+
+                const handleTrackOrder = async () => {
+                    if (!trackCode.trim()) {
+                        alert("الرجاء إدخال كود التتبع.");
+                        return;
+                    }
+
+                    setTrackingLoading(true);
+                    setTrackResult(null);
+
+                    try {
+                        const q = query(collection(db, "orders"), where("trackingCode", "==", trackCode.trim()));
+                        const querySnapshot = await getDocs(q);
+
+                        if (querySnapshot.empty) {
+                            setTrackResult({ error: "لا يوجد أي طلب بهذا الكود." });
+                        } else {
+                            querySnapshot.forEach((doc) => {
+                                setTrackResult(doc.data());
+                            });
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        setTrackResult({ error: "حدث خطأ أثناء البحث." });
+                    } finally {
+                        setTrackingLoading(false);
+                    }
+                };
+
+                return (
+                    <div className="min-h-screen p-3 sm:p-6 relative" dir="rtl">
+                        {successModalData && (
+                            <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                                <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-md w-full p-6 text-center animate-fadeIn">
+                                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">✓</div>
+                                    <h3 className="text-xl font-bold text-stone-900 mb-1">تم إرسال طلبك عبر ProgriMa بنجاح!</h3>
+                                    <p className="text-stone-500 text-sm mb-6">احتفظ بكود التتبع أدناه لمتابعة حالة مشروعك في أي وقت.</p>
+
+                                    <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 mb-5 flex items-center justify-between">
+                                        <div className="text-right">
+                                            <span className="text-xs text-stone-400 block mb-0.5">كود التتبع الخاص بك:</span>
+                                            <span className="text-2xl font-black text-amber-700 tracking-wider">{successModalData.trackingCode}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => copyToClipboard(successModalData.trackingCode)}
+                                            className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition shadow-sm">
+                                            {copied ? "تم النسخ! ✓" : "نسخ الكود 📋"}
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-red-50 border border-red-200 p-3 rounded-xl text-red-900 text-xs mb-6 text-right leading-relaxed font-semibold">
+                                        🚨 تنبيه هـام جداً: برجاء عدم إرسال أو تحويل أي أموال نهائياً قبل التواصل معنا والانتظار حتى نقوم بالرد عليك وتأكيد تفاصيل الطلب.
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setSuccessModalData(null)}
+                                        className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3 rounded-xl text-sm transition">
+                                        إغلاق وفهمت
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <header className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-stone-200 p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <h1 className="text-xl font-extrabold text-stone-900 tracking-tight">ProgriMa <span className="text-xs font-normal text-stone-500">| خدمات تطوير الويب</span></h1>
+                            <nav className="flex flex-wrap justify-center gap-2">
+                                <button 
+                                    onClick={() => setActiveTab('home')} 
+                                    className={`px-4 py-2 rounded-lg font-medium text-sm transition ${activeTab === 'home' ? 'bg-stone-900 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'}`}>
+                                    الرئيسية والخدمات
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('order')} 
+                                    className={`px-4 py-2 rounded-lg font-medium text-sm transition ${activeTab === 'order' ? 'bg-stone-900 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'}`}>
+                                    طلب موقع جديد
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('support')} 
+                                    className={`px-4 py-2 rounded-lg font-medium text-sm transition ${activeTab === 'support' ? 'bg-stone-900 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'}`}>
+                                    الدعم وتواصل معنا
+                                </button>
+                            </nav>
+                        </header>
+
+                        <main className="max-w-4xl mx-auto">
+                            <NetworkImageBanner />
+
+                            {activeTab === 'home' && (
+                                <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5 sm:p-8">
+                                    <h2 className="text-2xl font-bold text-stone-900 text-center mb-2">أنواع المواقع المتاحة والأسعار التقريبية</h2>
+                                    <p className="text-center text-stone-500 text-sm mb-6">اختر نوع الموقع المناسب لاحتياجك عبر ProgriMa، واضغط على زر الحجز للانتقال للطلب مباشرة.</p>
+                                    
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                                        <div className="border border-stone-200 rounded-xl p-5 text-center bg-stone-50/50 flex flex-col justify-between hover:border-stone-300 transition">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-stone-900 mb-2">موقع تعريفي</h3>
+                                                <p className="text-stone-600 text-sm mb-4">موقع صفحة واحدة يعرض أعمالك أو شركتك بشكل احترافي وسريع.</p>
+                                            </div>
+                                            <div>
+                                                <div className="text-amber-700 font-bold text-lg mb-3">يبدأ من 1500 جنيه</div>
+                                                <button onClick={() => handleSelectProduct('موقع تعريفي')} className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2.5 rounded-lg text-sm transition">اختر هذا النوع</button>
+                                            </div>
+                                        </div>
+
+                                        <div className="border border-stone-200 rounded-xl p-5 text-center bg-stone-50/50 flex flex-col justify-between hover:border-stone-300 transition">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-stone-900 mb-2">متجر إلكتروني</h3>
+                                                <p className="text-stone-600 text-sm mb-4">متجر كامل لعرض المنتجات مع سلة شراء ونظام طلبات متكامل.</p>
+                                            </div>
+                                            <div>
+                                                <div className="text-amber-700 font-bold text-lg mb-3">يبدأ من 4000 جنيه</div>
+                                                <button onClick={() => handleSelectProduct('متجر إلكتروني')} className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2.5 rounded-lg text-sm transition">اختر هذا النوع</button>
+                                            </div>
+                                        </div>
+
+                                        <div className="border border-stone-200 rounded-xl p-5 text-center bg-stone-50/50 flex flex-col justify-between hover:border-stone-300 transition">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-stone-900 mb-2">موقع لوحة تحكم وإدارة</h3>
+                                                <p className="text-stone-600 text-sm mb-4">نظام ويب تفاعلي مع قاعدة بيانات وإدارة مستخدمين وطلبات مخصصة.</p>
+                                            </div>
+                                            <div>
+                                                <div className="text-amber-700 font-bold text-lg mb-3">يبدأ من 6000 جنيه</div>
+                                                <button onClick={() => handleSelectProduct('موقع لوحة تحكم وإدارة')} className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-2.5 rounded-lg text-sm transition">اختر هذا النوع</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'order' && (
+                                <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5 sm:p-8">
+                                    <h2 className="text-2xl font-bold text-stone-900 text-center mb-6">نموذج طلب موقع ويب جديد (ProgriMa)</h2>
+                                    
+                                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-amber-900 text-sm mb-6 space-y-2 leading-relaxed">
+                                        <div><strong>⚠️ تعليمات الدفع:</strong> برجاء التحويل عبر <b>أورانج كاش</b> أو من خلال تطبيق <b>إنستا باي (InstaPay) باختيار "التحويل إلى محفظة إلكترونية"</b> على الرقم: <b className="text-amber-800 text-base">01222635954</b>.</div>
+                                        <div className="text-red-700 font-bold pt-1 border-t border-amber-200/60">
+                                            🚨 تنبيه هام: يرجى عدم إرسال أي أموال قبل التواصل معنا والانتظار حتى نقوم بالرد عليك وتأكيد الطلب أولاً!
+                                        </div>
+                                    </div>
+
+                                    <form onSubmit={handleSubmitOrder} className="space-y-4">
+                                        <div>
+                                            <label className="block font-semibold text-sm mb-1 text-stone-700">اسم العميل:</label>
+                                            <input 
+                                                type="text" 
+                                                value={name} 
+                                                onChange={(e) => setName(e.target.value)} 
+                                                required 
+                                                placeholder="أدخل اسمك الكامل" 
+                                                className="w-full p-3 border border-stone-300 rounded-lg text-sm focus:outline-none focus:border-stone-900 bg-stone-50/30"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block font-semibold text-sm mb-1 text-stone-700">البريد الإلكتروني للتواصل:</label>
+                                            <input 
+                                                type="email" 
+                                                value={contact} 
+                                                onChange={(e) => setContact(e.target.value)} 
+                                                required 
+                                                placeholder="example@domain.com" 
+                                                className="w-full p-3 border border-stone-300 rounded-lg text-sm focus:outline-none focus:border-stone-900 bg-stone-50/30"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block font-semibold text-sm mb-1 text-stone-700">نوع الموقع أو تفاصيل الطلب:</label>
+                                            <textarea 
+                                                rows="3" 
+                                                value={details} 
+                                                onChange={(e) => setDetails(e.target.value)} 
+                                                required 
+                                                placeholder="اكتب تفاصيل الطلب أو اختره من الرئيسية..." 
+                                                className="w-full p-3 border border-stone-300 rounded-lg text-sm focus:outline-none focus:border-stone-900 bg-stone-50/30"
+                                            ></textarea>
+                                        </div>
+
+                                        <div>
+                                            <label className="block font-semibold text-sm mb-1 text-stone-700">إرفاق صورة أو تصميم مقترح (اختياري - حتى 25 ميجابايت):</label>
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={(e) => setImageFile(e.target.files[0])} 
+                                                className="w-full p-2 border border-stone-300 rounded-lg text-sm bg-stone-50 text-stone-600"
+                                            />
+                                        </div>
+
+                                        <button 
+                                            type="submit" 
+                                            disabled={submitting}
+                                            className="w-full bg-amber-700 hover:bg-amber-800 text-white font-bold p-3.5 rounded-lg text-base transition shadow-sm disabled:opacity-50">
+                                            {submitting ? "جاري معالجة الطلب وإرساله..." : "إرسال الطلب وإتمام الحجز"}
+                                        </button>
+                                    </form>
+
+                                    <div className="mt-8 pt-6 border-t border-stone-200">
+                                        <h3 className="text-lg font-bold text-stone-900 mb-3 text-center">تتبع حالة طلبك بكود التتبع</h3>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                value={trackCode} 
+                                                onChange={(e) => setTrackCode(e.target.value)} 
+                                                placeholder="أدخل كود التتبع المكون من 4 أرقام..." 
+                                                className="flex-1 p-3 border border-stone-300 rounded-lg text-sm focus:outline-none focus:border-stone-900 bg-stone-50/30"
+                                            />
+                                            <button 
+                                                type="button" 
+                                                onClick={handleTrackOrder}
+                                                className="bg-stone-800 hover:bg-stone-900 text-white font-bold px-5 py-3 rounded-lg text-sm transition">
+                                                بحث
+                                            </button>
+                                        </div>
+
+                                        {trackingLoading && <div className="text-center text-stone-500 py-3 text-sm">جاري البحث...</div>}
+
+                                        {trackResult && (
+                                            <div className="mt-4 p-4 bg-stone-50 rounded-xl text-center border border-stone-200">
+                                                {trackResult.error ? (
+                                                    <span className="text-red-600 font-bold text-sm">{trackResult.error}</span>
+                                                ) : (
+                                                    <div className="space-y-2 text-sm text-stone-700">
+                                                        <div><b>اسم العميل:</b> {trackResult.name}</div>
+                                                        <div><b>التفاصيل:</b> {trackResult.details}</div>
+                                                        <div><b>الحالة:</b> <span className="text-amber-700 font-bold">{trackResult.status}</span></div>
+                                                        {trackResult.imageBase64 && (
+                                                            <div className="mt-2">
+                                                                <img src={trackResult.imageBase64} alt="مرفق" className="max-h-32 mx-auto rounded-lg border border-stone-300" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'support' && (
+                                <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 sm:p-10 text-center">
+                                    <h2 className="text-2xl font-bold text-stone-900 mb-4">الدعم الفني وتواصل معنا (ProgriMa)</h2>
+                                    <p className="text-stone-600 text-base leading-relaxed max-w-lg mx-auto mb-6">
+                                        إذا واجهتك أي مشكلة، أو أردت الاستفسار عن تفاصيل مشروعك وبرمجته، يمكنك التواصل معنا مباشرة عبر الوسائل التالية:
+                                    </p>
+
+                                    <div className="space-y-4 inline-block text-right bg-stone-50 p-6 rounded-2xl border border-stone-200 w-full max-w-md">
+                                        <div>
+                                            <span className="font-bold text-stone-700 block mb-1">البريد الإلكتروني:</span>
+                                            <a href="mailto:eyad652000@gmail.com" className="text-stone-900 font-bold hover:underline text-lg">eyad652000@gmail.com</a>
+                                        </div>
+                                        
+                                        <div className="pt-3 border-t border-stone-200">
+                                            <span className="font-bold text-stone-700 block mb-1">المحفظة والدعم المالي / الواتساب:</span>
+                                            <span className="text-amber-700 font-bold text-lg block mb-3">01222635954</span>
+                                            <a 
+                                                href="https://wa.me/201222635954" 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white text-center py-3 rounded-xl font-bold transition shadow-sm">
+                                                تواصل عبر واتساب مباشرة 💬
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </main>
+                    </div>
+                );
+            }
+
+            ReactDOM.createRoot(document.getElementById('root')).render(<ClientApp />);
+        });
+    </script>
+</body>
+</html>
